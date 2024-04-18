@@ -14,9 +14,9 @@ This repository contains an annotated bash script (SNP_calling_GATK4.sh) which o
 9 Hard filtering - SCRIPT 8_HardFiltering.pbs
 10 2nd recalibration on unrecalibrated data & before/after plots - SCRIPT 6_BQSR_recal2.pbs
 ######### CHECK FOR CONVERGENCE IN THE BEFORE/AFTER RECALIBRATION PLOTS ########
-## IF CONVERGENCE
+# If convergence
 11a "true" variant calling on recalibrated bam files - SCRIPT 10_final.pbs
-## IF NO CONVERGENCE
+# If no convergence
 11b Repeat steps from 7-10 until convergence (usually 2-4 times is enough)
 
 Each step is associated with a pbs script and was set to run on the JCU HPC machine. Note that some are best run as array jobs (e.g. mapping, haplotype calling and BQSR)
@@ -34,7 +34,7 @@ Baraf, L., Hung, J. and Cowman, P. (in press) Phylogenomics of marine angelfishe
 If you have any questions or issues running this worfkflow - feel free to reach out!
 lauriane.baraf@my.jcu.edu.au
 
-Best Fishes and Happy Coding!
+BEST FISHES AND HAPPY CODING !
 
 
 
