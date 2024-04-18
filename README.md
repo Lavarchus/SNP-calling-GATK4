@@ -27,7 +27,7 @@ R (v.4.0.3)
 versions in parentheses were used in provided scripts
 
 ## CITATION
-Baraf, L., Hung, J. and Cowman, P. (in press) Phylogenomics of marine angelfishes: diagnosing sources of systematic discordance for an iconic reef fish family (F: Pomacanthidae)."
+Baraf, L., Hung, J. and Cowman, P. (in press) Phylogenomics of marine angelfishes: diagnosing sources of systematic discordance for an iconic reef fish family (F: Pomacanthidae)."  
 Workflow was modified from Erickson, K. L., Pentico, A., Quattrini, A. M., & McFadden, C. S. (2021). New approaches to species delimitation and population structure of anthozoans: Two case studies of octocorals using ultraconserved elements and exons. Molecular Ecology Resources, 21(1), 78-92
 
 ## CONTACT
