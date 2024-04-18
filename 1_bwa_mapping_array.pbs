@@ -1,0 +1,85 @@
+#!/bin/bash
+#PBS -j oe
+#PBS -m ae
+#PBS -N 1_mapping_array
+#PBS -l select=1:ncpus=5:mem=10gb
+#PBS -l walltime=5:00:00
+#PBS -M your@email.com
+#PBS -J 0-90
+
+ncpu=$(qstat -f $PBS_JOBID | grep "Resource_List.ncpus" | cut -d= -f2 | sed 's/ //g') 
+s=$(if [ $ncpu == 1 ]; then echo ""; else echo "s"; fi)
+mem=$(qstat -f $PBS_JOBID | grep "Resource_List.mem" | cut -d= -f2 | sed 's/ //g')
+echo $(date)
+echo "------------------------------------------------------"
+echo "This job is allocated "$ncpu" CPU core$s and $mem on "
+cat $PBS_NODEFILE | uniq
+echo "------------------------------------------------------"
+echo "PBS: Submitted to $PBS_QUEUE@$PBS_O_HOST"
+echo "PBS: Working directory is $PBS_O_WORKDIR"
+echo "PBS: Job identifier is $PBS_JOBID"
+echo "PBS: Job name is $PBS_JOBNAME"
+echo "------------------------------------------------------"
+
+shopt -s expand_aliases
+source /etc/profile.d/modules.sh
+
+# Load modules
+module load conda3
+source $CONDA_PROF/conda.sh
+conda activate bwa-0.7.17
+conda activate --stack samtools-1.12
+
+# Set array index and variables
+id=${PBS_ARRAY_INDEX}
+READS_FOLDER=($(ls /path/to/snp_calling/cleanedreads_PMCO))
+SAMPLE_NAME=${READS_FOLDER[$id]}
+REF_FASTA="/path/to/snp_calling/reference/reference.unaligned.fasta"
+LOGDIR="/path/to/snp_calling/logs/1_mapping_logs"
+
+# Map R1R2 reads and singleton files - give path to paired read 1 & read 2 and single reads if you have some
+r1=$(echo "/path/to/snp_calling/cleanedreads_PMCO/$SAMPLE_NAME/split-adapter-quality-trimmed/$SAMPLE_NAME-READ1.fastq.gz")
+r2=$(echo "/path/to/snp_calling/cleanedreads_PMCO/$SAMPLE_NAME/split-adapter-quality-trimmed/$SAMPLE_NAME-READ2.fastq.gz")
+singleton=$(echo "/path/to/snp_calling/cleanedreads_PMCO/$SAMPLE_NAME/split-adapter-quality-trimmed/$SAMPLE_NAME-READ-singleton.fastq.gz")
+
+# Map reads with algorithm mem for illumina reads 70bp-1Mb
+# If you used a prefix when indexing your reference sequence you can use it instead of $REF_FASTA
+cd $OUTDIR
+bwa mem -t 5 -B 10 -M -R "@RG\tID:$SAMPLE_NAME\tSM:$SAMPLE_NAME\tPL:Illumina" $REF_FASTA $r1 $r2 > $SAMPLE_NAME.ref_pair.sam &&
+bwa mem -t 5 -B 10 -M -R "@RG\tID:$SAMPLE_NAME\tSM:$SAMPLE_NAME\tPL:Illumina" $REF_FASTA $singleton > $SAMPLE_NAME.ref_single.sam &
+
+wait
+
+# Sort reads
+samtools view -@ 5 -bS $SAMPLE_NAME.ref_pair.sam | samtools sort -@ 5 -m 30000000000 -o $SAMPLE_NAME.ref_pair_sorted.bam &&
+samtools view -@ 5 -bS $SAMPLE_NAME.ref_single.sam | samtools sort -@ 5 -m 30000000000 -o $SAMPLE_NAME.ref_single_sorted.bam &
+
+wait
+
+# Mark duplicates with Picard
+# NOTE: if some of your samples don't have single reads you might get an error here so double check that this step ran correctly - if no singleton run without INPUT=$SAMPLE_NAME.ref_single_sorted.bam
+java -Xmx2g -jar /sw/picard/2.18.1/picard.jar MarkDuplicates INPUT=$SAMPLE_NAME.ref_pair_sorted.bam INPUT=$SAMPLE_NAME.ref_single_sorted.bam OUTPUT=$SAMPLE_NAME.ref_all_dedup.bam METRICS_FILE=$SAMPLE_NAME.ref_all_dedup_metricsfile MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=250 ASSUME_SORTED=true VALIDATION_STRINGENCY=SILENT REMOVE_DUPLICATES=True &
+
+wait
+
+# Index bam file
+java -Xmx2g -jar /sw/picard/2.18.1/picard.jar BuildBamIndex INPUT=$SAMPLE_NAME.ref_all_dedup.bam &
+
+wait
+    
+samtools flagstat -@ 5 $SAMPLE_NAME.ref_all_dedup.bam > $SAMPLE_NAME.ref_all_dedup_stats.txt &
+
+wait
+    
+#Get stats only for paired files before removing duplicates
+samtools flagstat $SAMPLE_NAME.ref_pair_sorted.bam > $SAMPLE_NAME.ref_pair_stats.txt &&
+    
+# Get depth with samtool. Denominator should be the length of the genome used as reference, in this case the total bp length of all the reference's sequences add up to 1,042,439bp; calculated with: samtools view -H *bamfile* | grep -P '^@SQ' | cut -f 3 -d ':' | awk '{sum+=$1} END {print sum}'
+samtools depth $SAMPLE_NAME.ref_all_dedup.bam  |  awk '{sum+=$3; sumsq+=$3*$3} END { print $SAMPLE_NAME; print  "Average = ",sum/1042439; print "Stdev = ",sqrt(sumsq/1042439 - (sum/1042439)**2)}' >> depth_stats.txt &
+
+wait
+
+# clean logs away once done running - move the last one manually
+mv $PBS_O_WORKDIR/$PBS_JOBNAME.* $LOGDIR
+
+
