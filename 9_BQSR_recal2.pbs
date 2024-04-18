@@ -1,0 +1,95 @@
+#!/bin/bash
+#PBS -j oe
+#PBS -m ae
+#PBS -N 9_BQSR_recal2
+#PBS -l select=1:ncpus=5:mem=10gb
+#PBS -l walltime=15:00:00
+#PBS -M your@email.au
+#PBS -J 0-90
+
+ncpu=$(qstat -f $PBS_JOBID | grep "Resource_List.ncpus" | cut -d= -f2 | sed 's/ //g') 
+s=$(if [ $ncpu == 1 ]; then echo ""; else echo "s"; fi)
+mem=$(qstat -f $PBS_JOBID | grep "Resource_List.mem" | cut -d= -f2 | sed 's/ //g')
+echo $(date)
+echo "------------------------------------------------------"
+echo "This job is allocated "$ncpu" CPU core$s and $mem on "
+cat $PBS_NODEFILE | uniq
+echo "------------------------------------------------------"
+echo "PBS: Submitted to $PBS_QUEUE@$PBS_O_HOST"
+echo "PBS: Working directory is $PBS_O_WORKDIR"
+echo "PBS: Job identifier is $PBS_JOBID"
+echo "PBS: Job name is $PBS_JOBNAME"
+echo "------------------------------------------------------"
+
+cd path/to/snp_calling/
+shopt -s expand_aliases
+source /etc/profile.d/modules.sh
+
+# Load modules
+module load conda3
+source $CONDA_PROF/conda.sh
+conda activate gatk4-4.2.0.0
+conda activate --stack R-4.0.3
+
+# Define variables and array
+REFERENCE="$PWD/reference/reference.unaligned.fasta"
+UNRECAL_BAMS=($(ls $PWD/1_mapping_output/*dedup.bam))
+OUTDIR="$PWD/9_BQSR_recal2_output"
+LOGDIR="$PWD/logs/9_BQSR_recal2_logs"
+# Define array
+id=${PBS_ARRAY_INDEX}
+SAMPLE=${UNRECAL_BAMS[$id]}
+
+# Taxon or sample we are working now
+echo "Processing $SAMPLE"
+# Get sample names
+SAMPLE_NAME=$(echo $SAMPLE | cut -d/ -f7 | cut -d. -f1)
+echo $SAMPLE_NAME
+
+## 2ND RECALIBRATION ON UNCALIBRATED BAMS
+# Get recalibration table after 2nd pass on unrecalibrated data, if did indel masking then comment out --known-sites bqsr_indels_recal1.vcf
+
+  gatk BaseRecalibrator \
+    -R ${REFERENCE} \
+    -I ${SAMPLE} \
+    --known-sites 8_hardfiltering_output/bqsr_snps_recal1.vcf \
+    --known-sites 8_hardfiltering_output/bqsr_indels_recal1.vcf \
+    -O ${OUTDIR}/${SAMPLE_NAME}_recal2.table &
+
+wait
+
+# Run ApplyBQSR with the recal table from last step to create a new bam file with the adjusted base quality scores
+gatk ApplyBQSR \
+    -R ${REFERENCE} \
+    -I ${SAMPLE} \
+    --bqsr-recal-file ${OUTDI}R/${SAMPLE_NAME}_recal2.table \
+    -O ${OUTDIR}/${SAMPLE_NAME}_recal2.bams &
+
+wait
+
+# Run BaseRecalibrator on the recalibrated bam files to get the table with corrected base scores after 2nd recalibration to plot before/after. If did indel masking, comment out --known-sites bqsr_indels_recal1.vcf
+gatk BaseRecalibrator \
+    -R ${REFERENCE} \
+    -I ${OUTDIR}/${SAMPLE_NAME}_recal2.bams \
+    --known-sites 8_hardfiltering_output/bqsr_snps_recal1.vcf \
+    --known-sites 8_hardfiltering_output/bqsr_indels_recal1.vcf \
+    -O ${OUTDIR}/${SAMPLE_NAME}_post_recal2.table &
+
+wait
+
+# Before/After recalibration plots to see how the first recalibration worked out on the original data. You want to look for convergence. If it converges you can go ahead into a "true" variant calling run and call on the recalibrated bam files. If results aren't converging, you'll need to bootstrap your data by repeating all the steps from HaplotypeCaller on the unrecalibrated data until the plots show convergence (usually 2-4 times).
+
+# R packages that needs to be installed for AnalyzeCovariates: gsalib, ggplot2
+# Before/After plot comparing 1st and 2nd recalibrations
+
+gatk AnalyzeCovariates \
+    -before 5_BQSR_recal1_output/${SAMPLE_NAME}_post_recal1.table \
+    -after ${OUTDIR}/${SAMPLE_NAME}_post_recal2.table \
+    -plots ${OUTDIR}/${SAMPLE_NAME}_recalibration_plot_RECAL2.pdf &
+
+wait
+
+echo "Second recalibration complete for ${SAMPLE} !"
+
+
+
