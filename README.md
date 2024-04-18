@@ -1,6 +1,6 @@
 # SNP-calling-GATK4
 
-This repository contains an annotated bash script (SNP_calling_GATK4.sh) which outlines all the steps (see below) required for the bootstrapping workflow to conduct variant calling (.vcf) on contigs (here UCE).
+This repository contains an annotated bash script (SNP_calling_GATK4.sh) which outlines all the steps (see below) required for the bootstrapping workflow to conduct variant calling on contigs (here UCE).
 
 ## STEPS
 1 Data preparation - get reference, index it and generate sequence dictionnary  
@@ -19,18 +19,19 @@ If no convergence - 11b Repeat steps from 7-10 until convergence (usually 2-4 ti
 
 Each step is associated with a pbs script and was set to run on the JCU HPC machine. Note that some are best run as array jobs (e.g. mapping, haplotype calling and BQSR)
 
-## REQUIRED CONTAINERS TO RUN THE WORKFLOW versions in parentheses were used in provided scripts
+## REQUIRED CONTAINERS TO RUN THE WORKFLOW
 bwa (v.0.7.17)  
 samtools (v.1.12)  
 gatk4 (v.4.2.0.0)  
 R (v.4.0.3)  
+versions in parentheses were used in provided scripts
 
 ## CITATION
 Baraf, L., Hung, J. and Cowman, P. (in press) Phylogenomics of marine angelfishes: diagnosing sources of systematic discordance for an iconic reef fish family (F: Pomacanthidae)."
+Workflow was modified from Erickson, K. L., Pentico, A., Quattrini, A. M., & McFadden, C. S. (2021). New approaches to species delimitation and population structure of anthozoans: Two case studies of octocorals using ultraconserved elements and exons. Molecular Ecology Resources, 21(1), 78-92
 
 ## CONTACT
-If you have any questions or issues running this worfkflow - feel free to reach out!
-lauriane.baraf@my.jcu.edu.au
+If you have any questions or issues running this worfkflow - feel free to reach out at lauriane.baraf@my.jcu.edu.au
 
 ## BEST FISHES AND HAPPY CODING !
 
