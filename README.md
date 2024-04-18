@@ -31,7 +31,7 @@ Baraf, L., Hung, J. and Cowman, P. (in press) Phylogenomics of marine angelfishe
 Workflow was modified from Erickson, K. L., Pentico, A., Quattrini, A. M., & McFadden, C. S. (2021). New approaches to species delimitation and population structure of anthozoans: Two case studies of octocorals using ultraconserved elements and exons. Molecular Ecology Resources, 21(1), 78-92
 
 ## CONTACT
-If you have any questions or issues running this worfkflow - feel free to reach out at lauriane.baraf@my.jcu.edu.au
+If you have any questions or issues running this workflow - feel free to reach out at lauriane.baraf@my.jcu.edu.au
 
 ## BEST FISHES AND HAPPY CODING !
 
