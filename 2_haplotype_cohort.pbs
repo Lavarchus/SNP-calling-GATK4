@@ -1,0 +1,65 @@
+#!/bin/bash
+#PBS -j oe
+#PBS -m ae
+#PBS -N 2_haplotype_cohort
+#PBS -l select=1:ncpus=5:mem=20gb
+#PBS -l walltime=15:00:00
+#PBS -M your@email.au
+#PBS -J 0-90
+
+ncpu=$(qstat -f $PBS_JOBID | grep "Resource_List.ncpus" | cut -d= -f2 | sed 's/ //g') 
+s=$(if [ $ncpu == 1 ]; then echo ""; else echo "s"; fi)
+mem=$(qstat -f $PBS_JOBID | grep "Resource_List.mem" | cut -d= -f2 | sed 's/ //g')
+echo $(date)
+echo "------------------------------------------------------"
+echo "This job is allocated "$ncpu" CPU core$s and $mem on "
+cat $PBS_NODEFILE | uniq
+echo "------------------------------------------------------"
+echo "PBS: Submitted to $PBS_QUEUE@$PBS_O_HOST"
+echo "PBS: Working directory is $PBS_O_WORKDIR"
+echo "PBS: Job identifier is $PBS_JOBID"
+echo "PBS: Job name is $PBS_JOBNAME"
+echo "------------------------------------------------------"
+
+cd /path/to/snp_calling/
+
+shopt -s expand_aliases
+source /etc/profile.d/modules.sh
+
+# Load modules
+module load conda3
+source $CONDA_PROF/conda.sh
+conda activate gatk4-4.2.0.0
+
+# Define variables
+# Reference taxon, which is the unaligned exploded fasta from the phyluce pipeline
+REFERENCE="/path/to/snp_calling/reference/reference.unaligned.fasta"
+# Path to reads after mapping and removing of duplicates
+MAPPED_BAMS=($(ls /path/to/snp_calling/1_mapping_output/*all_dedup.bam))
+OUTDIR="/path/to/snp_calling/2_haplotype_cohort_output"
+LOGDIR="/path/to/snp_calling/logs/2_haplotype_cohort_logs"
+
+# Define array
+id=${PBS_ARRAY_INDEX}
+SAMPLE=${MAPPED_BAMS[$id]}
+
+# Taxon or sample we are working now
+echo "Processing $SAMPLE"
+# Get sample names
+OUTPUT_BASENAME=$(echo $SAMPLE | cut -d/ -f7)
+echo $OUTPUT_BASENAME
+OUTPUT_NAME=$(echo $OUTPUT_BASENAME | cut -d. -f1).g.vcf
+echo $OUTPUT_NAME
+
+# Initial variant calling
+gatk HaplotypeCaller \
+    -R ${REFERENCE} \
+    -I ${SAMPLE} \
+    -O ${OUTDIR}/${OUTPUT_NAME} \
+    --emit-ref-confidence GVCF \
+    --contamination-fraction-to-filter 0.0002 \
+    --min-base-quality-score 20 \
+    --phred-scaled-global-read-mismapping-rate 30 \
+    --standard-min-confidence-threshold-for-calling 40.0
+
+
