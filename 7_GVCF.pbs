@@ -1,0 +1,72 @@
+#!/bin/bash
+#PBS -j oe
+#PBS -m ae
+#PBS -N 7_GVCF
+#PBS -l select=1:ncpus=5:mem=10gb
+#PBS -l walltime=15:00:00
+#PBS -M your@email.au
+
+ncpu=$(qstat -f $PBS_JOBID | grep "Resource_List.ncpus" | cut -d= -f2 | sed 's/ //g') 
+s=$(if [ $ncpu == 1 ]; then echo ""; else echo "s"; fi)
+mem=$(qstat -f $PBS_JOBID | grep "Resource_List.mem" | cut -d= -f2 | sed 's/ //g')
+echo $(date)
+echo "------------------------------------------------------"
+echo "This job is allocated "$ncpu" CPU core$s and $mem on "
+cat $PBS_NODEFILE | uniq
+echo "------------------------------------------------------"
+echo "PBS: Submitted to $PBS_QUEUE@$PBS_O_HOST"
+echo "PBS: Working directory is $PBS_O_WORKDIR"
+echo "PBS: Job identifier is $PBS_JOBID"
+echo "PBS: Job name is $PBS_JOBNAME"
+echo "------------------------------------------------------"
+
+cd /path/to/snp_calling/
+shopt -s expand_aliases
+source /etc/profile.d/modules.sh
+
+# Load modules
+module load conda3
+source $CONDA_PROF/conda.sh
+conda activate gatk4-4.2.0.0
+
+# Define variables
+REFERENCE="$PWD/reference/reference.unaligned.fasta"
+COMBINED_GVCF_RECAL1="$PWD/6_haplotype_cohort_output/combined_gvcf_recal1.vcf"
+OUTDIR="$PWD/7_GVCF2_output"
+
+# Consolidate all g.vcf files (t=15mins)
+gatk CombineGVCFs \
+    -R ${REFERENCE} \
+    -V 6_haplotype_cohort_output/gvcf_recal1.list \
+    -O 6_haplotype_cohort_output/combined_gvcf_recal1.vcf &
+
+wait
+
+# Joint genotyping
+gatk GenotypeGVCFs \
+    -R ${REFERENCE} \
+    -V ${COMBINED_GVCF_RECAL1} \
+    -O ${OUTDIR}/genotyped_X_samples_recal1.vcf &
+
+wait
+
+#Extract SNPSs from callset
+gatk SelectVariants \
+	-R ${REFERENCE} \
+	-V ${OUTDIR}/genotyped_X_samples_recal1.vcf \
+	-select-type SNP \
+	-O ${OUTDIR}/genotyped_X_samples_snps_recal1.vcf &&
+
+# Extract indels from callset
+gatk SelectVariants \
+	-R ${REFERENCE} \
+	-V ${OUTDIR}/genotyped_X_samples_recal1.vcf \
+	-select-type INDEL \
+	-O ${OUTDIR}/genotyped_X_samples_indels_recal1.vcf &
+
+wait
+
+echo "Genotyping round 2 is complete!"
+
+
+
