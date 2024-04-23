@@ -1,6 +1,6 @@
 # SNP-calling-GATK4
 
-This repository contains an annotated bash script (SNP_calling_GATK4.sh) which outlines all the steps (see below) required for the bootstrapping workflow to conduct variant calling on contigs (here UCE).
+This repository contains an annotated bash script (snp_calling_GATK4.sh) which outlines all the steps (see below) required for the bootstrapping workflow to conduct variant calling on contigs (here UCE).
 
 ## STEPS
 1 Data preparation - get reference, index it and generate sequence dictionnary  
